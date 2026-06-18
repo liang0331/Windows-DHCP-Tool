@@ -15,6 +15,7 @@ import struct
 import subprocess
 import threading
 import time
+import locale
 import logging
 import traceback
 from typing import Dict, Optional, Tuple, List, Any
@@ -77,6 +78,399 @@ if _MISSING:
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+
+
+# ===========================================================================
+#  i18n — 全球排名前 10 语言
+# ===========================================================================
+SUPPORTED_LANGS = [
+    ("en", "English"),
+    ("zh", "中文"),
+    ("hi", "हिन्दी"),
+    ("es", "Español"),
+    ("fr", "Français"),
+    ("ar", "العربية"),
+    ("bn", "বাংলা"),
+    ("ru", "Русский"),
+    ("pt", "Português"),
+    ("ja", "日本語"),
+]
+
+I18N = {
+    # ---- window / top bar ----
+    "app_title": {
+        "en": "Windows DHCP Tool", "zh": "Windows DHCP 分配工具",
+        "hi": "Windows DHCP टूल", "es": "Herramienta DHCP de Windows",
+        "fr": "Outil DHCP Windows", "ar": "أداة DHCP لنظام ويندوز",
+        "bn": "Windows DHCP টুল", "ru": "Инструмент DHCP для Windows",
+        "pt": "Ferramenta DHCP do Windows", "ja": "Windows DHCP ツール",
+    },
+    "dhcp_server": {
+        "en": "DHCP Server", "zh": "DHCP 服务",
+        "hi": "DHCP सर्वर", "es": "Servidor DHCP",
+        "fr": "Serveur DHCP", "ar": "خادم DHCP",
+        "bn": "DHCP সার্ভার", "ru": "DHCP-сервер",
+        "pt": "Servidor DHCP", "ja": "DHCPサーバー",
+    },
+    "adapter": {
+        "en": "Adapter", "zh": "网卡",
+        "hi": "एडेप्टर", "es": "Adaptador",
+        "fr": "Carte réseau", "ar": "محول",
+        "bn": "অ্যাডাপ্টার", "ru": "Адаптер",
+        "pt": "Adaptador", "ja": "アダプター",
+    },
+    "refresh": {
+        "en": "Refresh", "zh": "刷新",
+        "hi": "रिफ्रेश", "es": "Actualizar",
+        "fr": "Actualiser", "ar": "تحديث",
+        "bn": "রিফ্রেশ", "ru": "Обновить",
+        "pt": "Atualizar", "ja": "更新",
+    },
+    "language": {
+        "en": "Language", "zh": "语言",
+        "hi": "भाषा", "es": "Idioma",
+        "fr": "Langue", "ar": "اللغة",
+        "bn": "ভাষা", "ru": "Язык",
+        "pt": "Idioma", "ja": "言語",
+    },
+    # ---- config panel ----
+    "dhcp_config": {
+        "en": "DHCP Configuration", "zh": "DHCP 配置",
+        "hi": "DHCP कॉन्फ़िगरेशन", "es": "Configuración DHCP",
+        "fr": "Configuration DHCP", "ar": "تكوين DHCP",
+        "bn": "DHCP কনফিগারেশন", "ru": "Конфигурация DHCP",
+        "pt": "Configuração DHCP", "ja": "DHCP設定",
+    },
+    "start_ip": {
+        "en": "Start IP", "zh": "起始 IP",
+        "hi": "प्रारंभ IP", "es": "IP inicial",
+        "fr": "IP de début", "ar": "IP البداية",
+        "bn": "শুরু IP", "ru": "Начальный IP",
+        "pt": "IP inicial", "ja": "開始IP",
+    },
+    "end_ip": {
+        "en": "End IP", "zh": "结束 IP",
+        "hi": "अंतिम IP", "es": "IP final",
+        "fr": "IP de fin", "ar": "IP النهاية",
+        "bn": "শেষ IP", "ru": "Конечный IP",
+        "pt": "IP final", "ja": "終了IP",
+    },
+    "subnet_mask": {
+        "en": "Subnet Mask", "zh": "子网掩码",
+        "hi": "सबनेट मास्क", "es": "Máscara de subred",
+        "fr": "Masque de sous-réseau", "ar": "قناع الشبكة الفرعية",
+        "bn": "সাবনেট মাস্ক", "ru": "Маска подсети",
+        "pt": "Máscara de sub-rede", "ja": "サブネットマスク",
+    },
+    "gateway": {
+        "en": "Gateway", "zh": "网关",
+        "hi": "गेटवे", "es": "Puerta de enlace",
+        "fr": "Passerelle", "ar": "البوابة",
+        "bn": "গেটওয়ে", "ru": "Шлюз",
+        "pt": "Gateway", "ja": "ゲートウェイ",
+    },
+    "dns_server": {
+        "en": "DNS Server", "zh": "DNS 服务器",
+        "hi": "DNS सर्वर", "es": "Servidor DNS",
+        "fr": "Serveur DNS", "ar": "خادم DNS",
+        "bn": "DNS সার্ভার", "ru": "DNS-сервер",
+        "pt": "Servidor DNS", "ja": "DNSサーバー",
+    },
+    "lease_time": {
+        "en": "Lease Time (s)", "zh": "租约时间（秒）",
+        "hi": "लीज़ समय (सेकंड)", "es": "Tiempo de concesión (s)",
+        "fr": "Durée du bail (s)", "ar": "مدة الإيجار (ثانية)",
+        "bn": "লিজ সময় (সেকেন্ড)", "ru": "Время аренды (сек)",
+        "pt": "Tempo de concessão (s)", "ja": "リース時間（秒）",
+    },
+    "start_dhcp": {
+        "en": "\u25b6  Start DHCP", "zh": "\u25b6  启动 DHCP",
+        "hi": "\u25b6  DHCP शुरू करें", "es": "\u25b6  Iniciar DHCP",
+        "fr": "\u25b6  Démarrer DHCP", "ar": "\u25b6  بدء DHCP",
+        "bn": "\u25b6  DHCP শুরু করুন", "ru": "\u25b6  Запустить DHCP",
+        "pt": "\u25b6  Iniciar DHCP", "ja": "\u25b6  DHCP開始",
+    },
+    "stop_dhcp": {
+        "en": "\u23f9  Stop DHCP", "zh": "\u23f9  停止 DHCP",
+        "hi": "\u23f9  DHCP रोकें", "es": "\u23f9  Detener DHCP",
+        "fr": "\u23f9  Arrêter DHCP", "ar": "\u23f9  إيقاف DHCP",
+        "bn": "\u23f9  DHCP বন্ধ করুন", "ru": "\u23f9  Остановить DHCP",
+        "pt": "\u23f9  Parar DHCP", "ja": "\u23f9  DHCP停止",
+    },
+    "running": {
+        "en": "\u25cf Running", "zh": "\u25cf 运行中",
+        "hi": "\u25cf चल रहा है", "es": "\u25cf En ejecución",
+        "fr": "\u25cf En cours", "ar": "\u25cf قيد التشغيل",
+        "bn": "\u25cf চলছে", "ru": "\u25cf Работает",
+        "pt": "\u25cf Em execução", "ja": "\u25cf 実行中",
+    },
+    "stopped": {
+        "en": "\u25cb Stopped", "zh": "\u25cb 已停止",
+        "hi": "\u25cb रुका हुआ", "es": "\u25cb Detenido",
+        "fr": "\u25cb Arrêté", "ar": "\u25cb متوقف",
+        "bn": "\u25cb বন্ধ", "ru": "\u25cb Остановлен",
+        "pt": "\u25cb Parado", "ja": "\u25cb 停止",
+    },
+    # ---- client table ----
+    "assigned_clients": {
+        "en": "Assigned Clients", "zh": "已分配客户端",
+        "hi": "आवंटित क्लाइंट", "es": "Clientes asignados",
+        "fr": "Clients attribués", "ar": "العملاء المعينون",
+        "bn": "বরাদ্দকৃত ক্লায়েন্ট", "ru": "Назначенные клиенты",
+        "pt": "Clientes atribuídos", "ja": "割り当て済みクライアント",
+    },
+    "clients_count": {
+        "en": "({} devices)", "zh": "({} 台)",
+        "hi": "({} डिवाइस)", "es": "({} dispositivos)",
+        "fr": "({} appareils)", "ar": "({} أجهزة)",
+        "bn": "({} ডিভাইস)", "ru": "({} устр.)",
+        "pt": "({} dispositivos)", "ja": "({}台)",
+    },
+    "col_mac": {
+        "en": "MAC Address", "zh": "MAC 地址",
+        "hi": "MAC पता", "es": "Dirección MAC",
+        "fr": "Adresse MAC", "ar": "عنوان MAC",
+        "bn": "MAC ঠিকানা", "ru": "MAC-адрес",
+        "pt": "Endereço MAC", "ja": "MACアドレス",
+    },
+    "col_ip": {
+        "en": "IP Address", "zh": "IP 地址",
+        "hi": "IP पता", "es": "Dirección IP",
+        "fr": "Adresse IP", "ar": "عنوان IP",
+        "bn": "IP ঠিকানা", "ru": "IP-адрес",
+        "pt": "Endereço IP", "ja": "IPアドレス",
+    },
+    "col_hostname": {
+        "en": "Hostname", "zh": "主机名",
+        "hi": "होस्टनाम", "es": "Nombre de host",
+        "fr": "Nom d'hôte", "ar": "اسم المضيف",
+        "bn": "হোস্টনাম", "ru": "Имя хоста",
+        "pt": "Nome do host", "ja": "ホスト名",
+    },
+    "col_remaining": {
+        "en": "Lease Remaining", "zh": "剩余租约",
+        "hi": "शेष लीज़", "es": "Concesión restante",
+        "fr": "Bail restant", "ar": "الإيجار المتبقي",
+        "bn": "অবশিষ্ট লিজ", "ru": "Остаток аренды",
+        "pt": "Concessão restante", "ja": "残リース",
+    },
+    "empty_clients": {
+        "en": "No clients connected, waiting for DHCP requests...",
+        "zh": "暂无客户端连接，等待 DHCP 请求...",
+        "hi": "कोई क्लाइंट कनेक्टेड नहीं, DHCP अनुरोध की प्रतीक्षा...",
+        "es": "Sin clientes conectados, esperando solicitudes DHCP...",
+        "fr": "Aucun client connecté, en attente de requêtes DHCP...",
+        "ar": "لا يوجد عملاء متصلون، في انتظار طلبات DHCP...",
+        "bn": "কোনও ক্লায়েন্ট সংযুক্ত নেই, DHCP অনুরোধের অপেক্ষায়...",
+        "ru": "Нет подключенных клиентов, ожидание запросов DHCP...",
+        "pt": "Sem clientes conectados, aguardando solicitações DHCP...",
+        "ja": "クライアントなし、DHCPリクエスト待機中...",
+    },
+    # ---- status bar ----
+    "listen_idle": {
+        "en": "Listen: — (not running)", "zh": "监听: — (未运行)",
+        "hi": "सुनें: — (चल नहीं रहा)", "es": "Escucha: — (inactivo)",
+        "fr": "Écoute: — (arrêté)", "ar": "استماع: — (غير يعمل)",
+        "bn": "শোনা: — (চলছে না)", "ru": "Прослушивание: — (не запущено)",
+        "pt": "Escuta: — (inativo)", "ja": "リッスン: — (停止中)",
+    },
+    "listen_running": {
+        "en": "Listen: 0.0.0.0:67   Adapter: {}", "zh": "监听: 0.0.0.0:67   绑定网卡: {}",
+        "hi": "सुनें: 0.0.0.0:67   एडेप्टर: {}", "es": "Escucha: 0.0.0.0:67   Adaptador: {}",
+        "fr": "Écoute: 0.0.0.0:67   Carte: {}", "ar": "استماع: 0.0.0.0:67   محول: {}",
+        "bn": "শোনা: 0.0.0.0:67   অ্যাডাপ্টার: {}", "ru": "Прослуш.: 0.0.0.0:67   Адаптер: {}",
+        "pt": "Escuta: 0.0.0.0:67   Adaptador: {}", "ja": "リッスン: 0.0.0.0:67   アダプター: {}",
+    },
+    "firewall_pending": {
+        "en": "Firewall: Not configured", "zh": "防火墙: 未配置",
+        "hi": "फ़ायरवॉल: कॉन्फ़िगर नहीं", "es": "Firewall: Sin configurar",
+        "fr": "Pare-feu: Non configuré", "ar": "جدار الحماية: غير مكون",
+        "bn": "ফায়ারওয়াল: কনফিগার করা নেই", "ru": "Брандмауэр: Не настроен",
+        "pt": "Firewall: Não configurado", "ja": "ファイアウォール: 未設定",
+    },
+    "firewall_ok": {
+        "en": "Firewall: UDP 67/68 allowed", "zh": "防火墙: 已放行 UDP 67/68",
+        "hi": "फ़ायरवॉल: UDP 67/68 अनुमत", "es": "Firewall: UDP 67/68 permitido",
+        "fr": "Pare-feu: UDP 67/68 autorisé", "ar": "جدار الحماية: UDP 67/68 مسموح",
+        "bn": "ফায়ারওয়াল: UDP 67/68 অনুমোদিত", "ru": "Брандмауэр: UDP 67/68 разрешен",
+        "pt": "Firewall: UDP 67/68 permitido", "ja": "ファイアウォール: UDP 67/68 許可済み",
+    },
+    "firewall_fail": {
+        "en": "Firewall: Failed, please allow manually", "zh": "防火墙: 配置失败，请手动放行",
+        "hi": "फ़ायरवॉल: विफल, कृपया मैन्युअल रूप से अनुमति दें", "es": "Firewall: Falló, permita manualmente",
+        "fr": "Pare-feu: Échec, autorisez manuellement", "ar": "جدار الحماية: فشل، يرجى السماح يدويًا",
+        "bn": "ফায়ারওয়াল: ব্যর্থ, ম্যানুয়ালি অনুমতি দিন", "ru": "Брандмауэр: Ошибка, разрешите вручную",
+        "pt": "Firewall: Falhou, permita manualmente", "ja": "ファイアウォール: 失敗、手動で許可してください",
+    },
+    "uptime_idle": {
+        "en": "Uptime: 00:00:00", "zh": "运行时间: 00:00:00",
+        "hi": "अपटाइम: 00:00:00", "es": "Tiempo activo: 00:00:00",
+        "fr": "Durée: 00:00:00", "ar": "وقت التشغيل: 00:00:00",
+        "bn": "আপটাইম: 00:00:00", "ru": "Время работы: 00:00:00",
+        "pt": "Tempo ativo: 00:00:00", "ja": "稼働時間: 00:00:00",
+    },
+    "uptime_running": {
+        "en": "Uptime: {}", "zh": "运行时间: {}",
+        "hi": "अपटाइम: {}", "es": "Tiempo activo: {}",
+        "fr": "Durée: {}", "ar": "وقت التشغيل: {}",
+        "bn": "আপটাইম: {}", "ru": "Время работы: {}",
+        "pt": "Tempo ativo: {}", "ja": "稼働時間: {}",
+    },
+    # ---- errors ----
+    "error_title": {
+        "en": "Error", "zh": "错误",
+        "hi": "त्रुटि", "es": "Error",
+        "fr": "Erreur", "ar": "خطأ",
+        "bn": "ত্রুটি", "ru": "Ошибка",
+        "pt": "Erro", "ja": "エラー",
+    },
+    "no_adapter": {
+        "en": "Please select a valid network adapter.",
+        "zh": "请选择一块有效的网卡。",
+        "hi": "कृपया एक मान्य नेटवर्क एडेप्टर चुनें।",
+        "es": "Seleccione un adaptador de red válido.",
+        "fr": "Veuillez sélectionner une carte réseau valide.",
+        "ar": "يرجى تحديد محول شبكة صالح.",
+        "bn": "অনুগ্রহ করে একটি বৈধ নেটওয়ার্ক অ্যাডাপ্টার নির্বাচন করুন।",
+        "ru": "Выберите действительный сетевой адаптер.",
+        "pt": "Selecione um adaptador de rede válido.",
+        "ja": "有効なネットワークアダプターを選択してください。",
+    },
+    "config_error": {
+        "en": "Configuration Error", "zh": "配置错误",
+        "hi": "कॉन्फ़िगरेशन त्रुटि", "es": "Error de configuración",
+        "fr": "Erreur de configuration", "ar": "خطأ في التكوين",
+        "bn": "কনফিগারেশন ত্রুটি", "ru": "Ошибка конфигурации",
+        "pt": "Erro de configuração", "ja": "設定エラー",
+    },
+    "invalid_ip": {
+        "en": '{} "{}" is not a valid IPv4 address.',
+        "zh": '{} "{}" 不是合法的 IPv4 地址。',
+        "hi": '{} "{}" एक मान्य IPv4 पता नहीं है।',
+        "es": '{} "{}" no es una dirección IPv4 válida.',
+        "fr": '{} "{}" n\'est pas une adresse IPv4 valide.',
+        "ar": '{} "{}" ليس عنوان IPv4 صالحًا.',
+        "bn": '{} "{}" একটি বৈধ IPv4 ঠিকানা নয়।',
+        "ru": '{} "{}" не является действительным IPv4-адресом.',
+        "pt": '{} "{}" não é um endereço IPv4 válido.',
+        "ja": '{} "{}" は有効なIPv4アドレスではありません。',
+    },
+    "lease_too_short": {
+        "en": "Lease time cannot be less than 60 seconds.",
+        "zh": "租约时间不能小于 60 秒。",
+        "hi": "लीज़ समय 60 सेकंड से कम नहीं हो सकता।",
+        "es": "El tiempo de concesión no puede ser menor a 60 segundos.",
+        "fr": "La durée du bail ne peut pas être inférieure à 60 secondes.",
+        "ar": "مدة الإيجار لا يمكن أن تقل عن 60 ثانية.",
+        "bn": "লিজ সময় 60 সেকেন্ডের কম হতে পারে না।",
+        "ru": "Время аренды не может быть меньше 60 секунд.",
+        "pt": "O tempo de concessão não pode ser inferior a 60 segundos.",
+        "ja": "リース時間は60秒未満にできません。",
+    },
+    "lease_not_int": {
+        "en": 'Lease time "{}" is not an integer.',
+        "zh": '租约时间 "{}" 不是整数。',
+        "hi": 'लीज़ समय "{}" एक पूर्णांक नहीं है।',
+        "es": 'El tiempo de concesión "{}" no es un número entero.',
+        "fr": 'La durée du bail "{}" n\'est pas un entier.',
+        "ar": 'مدة الإيجار "{}" ليست عددًا صحيحًا.',
+        "bn": 'লিজ সময় "{}" একটি পূর্ণসংখ্যা নয়।',
+        "ru": 'Время аренды "{}" не является целым числом.',
+        "pt": 'O tempo de concessão "{}" não é um número inteiro.',
+        "ja": 'リース時間 "{}" は整数ではありません。',
+    },
+    "start_gt_end": {
+        "en": "Start IP cannot be greater than End IP.",
+        "zh": "起始 IP 不能大于结束 IP。",
+        "hi": "प्रारंभ IP, अंतिम IP से बड़ा नहीं हो सकता।",
+        "es": "La IP inicial no puede ser mayor que la IP final.",
+        "fr": "L'IP de début ne peut pas être supérieure à l'IP de fin.",
+        "ar": "لا يمكن أن يكون IP البداية أكبر من IP النهاية.",
+        "bn": "শুরু IP, শেষ IP এর চেয়ে বড় হতে পারে না।",
+        "ru": "Начальный IP не может быть больше конечного IP.",
+        "pt": "O IP inicial não pode ser maior que o IP final.",
+        "ja": "開始IPは終了IPより大きくできません。",
+    },
+    "start_failed": {
+        "en": "Failed to start DHCP service. Check port usage and permissions.",
+        "zh": "无法启动 DHCP 服务，请检查端口占用和权限。",
+        "hi": "DHCP सेवा शुरू करने में विफल। पोर्ट उपयोग और अनुमतियां जांचें।",
+        "es": "Error al iniciar el servicio DHCP. Verifique puertos y permisos.",
+        "fr": "Échec du démarrage du service DHCP. Vérifiez les ports et permissions.",
+        "ar": "فشل بدء خدمة DHCP. تحقق من المنافذ والأذونات.",
+        "bn": "DHCP পরিষেবা শুরু করতে ব্যর্থ। পোর্ট ব্যবহার এবং অনুমতি পরীক্ষা করুন।",
+        "ru": "Не удалось запустить службу DHCP. Проверьте порты и права.",
+        "pt": "Falha ao iniciar o serviço DHCP. Verifique portas e permissões.",
+        "ja": "DHCPサービスの開始に失敗しました。ポートと権限を確認してください。",
+    },
+    "start_exception": {
+        "en": "Error during startup:\n{}", "zh": "启动过程中发生错误：\n{}",
+        "hi": "शुरुआत के दौरान त्रुटि:\n{}", "es": "Error durante el inicio:\n{}",
+        "fr": "Erreur lors du démarrage:\n{}", "ar": "خطأ أثناء البدء:\n{}",
+        "bn": "শুরুর সময় ত্রুটি:\n{}", "ru": "Ошибка при запуске:\n{}",
+        "pt": "Erro durante a inicialização:\n{}", "ja": "起動中にエラーが発生しました:\n{}",
+    },
+    "stop_exception": {
+        "en": "Error during stop:\n{}", "zh": "停止过程中发生错误：\n{}",
+        "hi": "रोकने के दौरान त्रुटि:\n{}", "es": "Error al detener:\n{}",
+        "fr": "Erreur lors de l'arrêt:\n{}", "ar": "خطأ أثناء الإيقاف:\n{}",
+        "bn": "বন্ধ করার সময় ত্রুটি:\n{}", "ru": "Ошибка при остановке:\n{}",
+        "pt": "Erro ao parar:\n{}", "ja": "停止中にエラーが発生しました:\n{}",
+    },
+    "fw_warning_title": {
+        "en": "Firewall Notice", "zh": "防火墙提示",
+        "hi": "फ़ायरवॉल सूचना", "es": "Aviso de firewall",
+        "fr": "Avis pare-feu", "ar": "إشعار جدار الحماية",
+        "bn": "ফায়ারওয়াল নোটিশ", "ru": "Уведомление брандмауэра",
+        "pt": "Aviso de firewall", "ja": "ファイアウォール通知",
+    },
+    "fw_warning_body": {
+        "en": "Failed to automatically allow UDP 67/68 in firewall.\nDHCP will still try to start, but may not receive client requests.\n\nPlease manually allow UDP 67/68 or check firewall settings.",
+        "zh": "自动放行防火墙 UDP 67/68 端口失败。\nDHCP 服务仍会尝试启动，但可能无法接收客户端请求。\n\n请手动放行 UDP 67/68 端口，或检查防火墙设置。",
+        "hi": "फ़ायरवॉल में UDP 67/68 को स्वचालित रूप से अनुमति देने में विफल।\nDHCP शुरू होने का प्रयास करेगा, लेकिन क्लाइंट अनुरोध प्राप्त नहीं कर सकता।\n\nकृपया UDP 67/68 को मैन्युअल रूप से अनुमति दें।",
+        "es": "Error al permitir UDP 67/68 en el firewall automáticamente.\nDHCP intentará iniciarse, pero puede no recibir solicitudes.\n\nPermita UDP 67/68 manualmente o verifique el firewall.",
+        "fr": "Échec de l'autorisation automatique UDP 67/68 dans le pare-feu.\nDHCP tentera de démarrer, mais peut ne pas recevoir les requêtes.\n\nAutorisez UDP 67/68 manuellement ou vérifiez le pare-feu.",
+        "ar": "فشل السماح التلقائي بـ UDP 67/68 في جدار الحماية.\nستحاول DHCP البدء، ولكن قد لا تتلقى طلبات العملاء.\n\nيرجى السماح يدويًا بـ UDP 67/68.",
+        "bn": "ফায়ারওয়ালে UDP 67/68 স্বয়ংক্রিয়ভাবে অনুমোদন ব্যর্থ।\nDHCP শুরু হওয়ার চেষ্টা করবে, কিন্তু ক্লায়েন্ট অনুরোধ নাও পেতে পারে।\n\nঅনুগ্রহ করে UDP 67/68 ম্যানুয়ালি অনুমোদন করুন।",
+        "ru": "Не удалось автоматически разрешить UDP 67/68 в брандмауэре.\nDHCP попытается запуститься, но может не получать запросы.\n\nРазрешите UDP 67/68 вручную или проверьте брандмауэр.",
+        "pt": "Falha ao permitir UDP 67/68 no firewall automaticamente.\nDHCP tentará iniciar, mas pode não receber solicitações.\n\nPermita UDP 67/68 manualmente ou verifique o firewall.",
+        "ja": "ファイアウォールでUDP 67/68の自動許可に失敗しました。\nDHCPは開始を試みますが、クライアントリクエストを受信できない可能性があります。\n\n手動でUDP 67/68を許可してください。",
+    },
+    "program_error": {
+        "en": "Program Error", "zh": "程序异常",
+        "hi": "प्रोग्राम त्रुटि", "es": "Error del programa",
+        "fr": "Erreur du programme", "ar": "خطأ في البرنامج",
+        "bn": "প্রোগ্রাম ত্রুটি", "ru": "Ошибка программы",
+        "pt": "Erro do programa", "ja": "プログラムエラー",
+    },
+    "uncaught_exception": {
+        "en": "Uncaught exception:\n{}", "zh": "发生未捕获的异常：\n{}",
+        "hi": "अनकैट अपवाद:\n{}", "es": "Excepción no capturada:\n{}",
+        "fr": "Exception non capturée:\n{}", "ar": "استثناء غير معالج:\n{}",
+        "bn": "অনধিকার প্রবেশ ব্যতিক্রম:\n{}", "ru": "Необработанное исключение:\n{}",
+        "pt": "Exceção não capturada:\n{}", "ja": "未処理の例外:\n{}",
+    },
+    "no_adapter_found": {
+        "en": "(No adapter found)", "zh": "（未找到可用网卡）",
+        "hi": "(कोई एडेप्टर नहीं मिला)", "es": "(Sin adaptador)",
+        "fr": "(Aucune carte trouvée)", "ar": "(لا يوجد محول)",
+        "bn": "(কোনও অ্যাডাপ্টার পাওয়া যায়নি)", "ru": "(Адаптер не найден)",
+        "pt": "(Nenhum adaptador)", "ja": "(アダプターなし)",
+    },
+}
+
+
+def detect_system_lang() -> str:
+    """Auto-detect system language, return lang code (e.g. 'en', 'zh')."""
+    try:
+        loc = locale.getdefaultlocale()[0] or locale.getlocale()[0] or ""
+    except Exception:
+        loc = ""
+    loc = loc.lower()
+    for code, _ in SUPPORTED_LANGS:
+        if loc.startswith(code):
+            return code
+    return "en"
 
 
 # ===========================================================================
@@ -713,7 +1107,11 @@ class DHCPToolApp(ctk.CTk):
         # 捕获所有未处理回调异常，确保 windowed 模式下也能弹窗提示
         self.report_callback_exception = self._on_tk_exception
 
-        self.title("Windows DHCP 分配工具")
+        # i18n: 自动检测系统语言
+        self._lang: str = detect_system_lang()
+        logger.info("系统语言: %s", self._lang)
+
+        self.title(self._t("app_title"))
         self.geometry("980x620")
         self.minsize(900, 590)
         self.resizable(True, True)
@@ -735,13 +1133,59 @@ class DHCPToolApp(ctk.CTk):
         logger.info("GUI 初始化完成")
 
     # ------------------------------------------------------------------
+    # i18n
+    # ------------------------------------------------------------------
+    def _t(self, key: str, *args) -> str:
+        """Translate a key to the current language. Supports {} placeholders."""
+        entry = I18N.get(key)
+        if not entry:
+            return key
+        text = entry.get(self._lang) or entry.get("en") or key
+        if args:
+            try:
+                text = text.format(*args)
+            except Exception:
+                pass
+        return text
+
+    def _on_language_change(self, selection: str) -> None:
+        """Handle language dropdown change."""
+        for code, name in SUPPORTED_LANGS:
+            if name == selection:
+                if code != self._lang:
+                    self._lang = code
+                    logger.info("切换语言: %s", code)
+                    self._rebuild_ui()
+                return
+
+    def _rebuild_ui(self) -> None:
+        """Destroy and rebuild entire UI with current language."""
+        # Stop refresh during rebuild
+        if self._refresh_job:
+            self.after_cancel(self._refresh_job)
+            self._refresh_job = None
+        # Remember running state
+        was_running = self._server.is_running
+        # Destroy all children
+        for child in self.winfo_children():
+            child.destroy()
+        # Update window title
+        self.title(self._t("app_title"))
+        # Rebuild
+        self._build_ui()
+        self._load_interfaces()
+        self._schedule_refresh()
+        if was_running:
+            self._set_running_state(True)
+
+    # ------------------------------------------------------------------
     # 全局异常兜底：把 tkinter 回调异常以弹窗形式展示
     # ------------------------------------------------------------------
     def _on_tk_exception(self, exc, val, tb) -> None:
         tb_text = "".join(traceback.format_exception(exc, val, tb))
         logger.error("Tkinter 回调异常:\n%s", tb_text)
         try:
-            messagebox.showerror("程序异常", f"发生未捕获的异常：\n{val}", parent=self)
+            messagebox.showerror(self._t("program_error"), self._t("uncaught_exception", val), parent=self)
         except Exception:
             pass
 
@@ -785,7 +1229,7 @@ class DHCPToolApp(ctk.CTk):
         self._build_status_bar()
 
     def _build_topbar(self) -> None:
-        """合并顶栏：左侧标题 + 右侧网卡选择与刷新（单层 48px）。"""
+        """合并顶栏：左侧标题 + 右侧语言选择 + 网卡选择与刷新（单层 48px）。"""
         bar = ctk.CTkFrame(self, corner_radius=0, fg_color=COLOR_HEADER, height=48)
         bar.pack(fill="x", side="top")
         bar.pack_propagate(False)
@@ -796,13 +1240,25 @@ class DHCPToolApp(ctk.CTk):
             text_color="#ffffff",
         ).pack(side="left", padx=16, pady=8)
 
-        # 网卡选择（靠右）
-        ctk.CTkLabel(bar, text="网卡", width=36, anchor="w",
+        # 语言选择（最右）
+        lang_names = [name for _, name in SUPPORTED_LANGS]
+        self._lang_var = ctk.StringVar(value=dict(SUPPORTED_LANGS).get(self._lang, "English"))
+        self._lang_combo = ctk.CTkComboBox(
+            bar, variable=self._lang_var, width=110,
+            state="readonly", command=self._on_language_change,
+            fg_color=COLOR_CARD_INNER, border_color="#e0f7fa", border_width=1,
+            dropdown_fg_color=COLOR_CARD_INNER,
+            values=lang_names,
+        )
+        self._lang_combo.pack(side="right", padx=4, pady=8)
+
+        # 网卡选择（靠右，语言选择左边）
+        ctk.CTkLabel(bar, text=self._t("adapter"), width=36, anchor="w",
                      font=ctk.CTkFont(size=12, weight="bold"),
                      text_color="#e0f7fa").pack(side="right", padx=(6, 10), pady=8)
 
         ctk.CTkButton(
-            bar, text="刷新", width=56,
+            bar, text=self._t("refresh"), width=56,
             fg_color="transparent", border_color="#e0f7fa", border_width=1,
             text_color="#ffffff", hover_color=COLOR_HEADER_2,
             command=self._load_interfaces,
@@ -810,7 +1266,7 @@ class DHCPToolApp(ctk.CTk):
 
         self._iface_var = ctk.StringVar(value="")
         self._iface_combo = ctk.CTkComboBox(
-            bar, variable=self._iface_var, width=420,
+            bar, variable=self._iface_var, width=380,
             state="readonly", command=self._on_interface_changed,
             fg_color=COLOR_CARD_INNER, border_color=COLOR_ACCENT, border_width=1,
             dropdown_fg_color=COLOR_CARD_INNER,
@@ -823,7 +1279,7 @@ class DHCPToolApp(ctk.CTk):
         cfg_outer.grid(row=0, column=0, sticky="nsew", padx=(0, 7), pady=4)
 
         # 标题
-        ctk.CTkLabel(cfg_outer, text="DHCP 配置",
+        ctk.CTkLabel(cfg_outer, text=self._t("dhcp_config"),
                      font=ctk.CTkFont(size=15, weight="bold"),
                      text_color=COLOR_TEXT).pack(anchor="w", padx=16, pady=(14, 4))
 
@@ -834,19 +1290,19 @@ class DHCPToolApp(ctk.CTk):
         grid_frame.columnconfigure(1, weight=1)
 
         # 2 列 × 3 行平铺
-        self._add_input_field(grid_frame, "起始 IP", "192.168.100.100", "_entry_start_ip", 0, 0)
-        self._add_input_field(grid_frame, "结束 IP", "192.168.100.200", "_entry_end_ip", 0, 1)
-        self._add_input_field(grid_frame, "子网掩码", "255.255.255.0", "_entry_mask", 1, 0)
-        self._add_input_field(grid_frame, "网关", "", "_entry_gateway", 1, 1)
-        self._add_input_field(grid_frame, "DNS 服务器", "8.8.8.8", "_entry_dns", 2, 0)
-        self._add_input_field(grid_frame, "租约时间（秒）", "3600", "_entry_lease", 2, 1)
+        self._add_input_field(grid_frame, self._t("start_ip"), "192.168.100.100", "_entry_start_ip", 0, 0)
+        self._add_input_field(grid_frame, self._t("end_ip"), "192.168.100.200", "_entry_end_ip", 0, 1)
+        self._add_input_field(grid_frame, self._t("subnet_mask"), "255.255.255.0", "_entry_mask", 1, 0)
+        self._add_input_field(grid_frame, self._t("gateway"), "", "_entry_gateway", 1, 1)
+        self._add_input_field(grid_frame, self._t("dns_server"), "8.8.8.8", "_entry_dns", 2, 0)
+        self._add_input_field(grid_frame, self._t("lease_time"), "3600", "_entry_lease", 2, 1)
 
         # ---- 控制按钮区 ----
         ctrl_frame = ctk.CTkFrame(cfg_outer, fg_color="transparent")
         ctrl_frame.pack(fill="x", padx=16, pady=(4, 14))
 
         self._btn_start = ctk.CTkButton(
-            ctrl_frame, text="▶  启动 DHCP", fg_color=COLOR_SUCCESS, hover_color="#1b5e20",
+            ctrl_frame, text=self._t("start_dhcp"), fg_color=COLOR_SUCCESS, hover_color="#1b5e20",
             width=150, height=40, corner_radius=10,
             font=ctk.CTkFont(size=14, weight="bold"), text_color="#ffffff",
             command=self._on_start,
@@ -854,7 +1310,7 @@ class DHCPToolApp(ctk.CTk):
         self._btn_start.pack(side="left", padx=(0, 8))
 
         self._btn_stop = ctk.CTkButton(
-            ctrl_frame, text="⏹  停止 DHCP", fg_color=COLOR_DANGER_DARK, hover_color=COLOR_DANGER,
+            ctrl_frame, text=self._t("stop_dhcp"), fg_color=COLOR_DANGER_DARK, hover_color=COLOR_DANGER,
             width=150, height=40, corner_radius=10,
             font=ctk.CTkFont(size=14, weight="bold"), text_color="#ffffff",
             state="disabled", command=self._on_stop,
@@ -863,7 +1319,7 @@ class DHCPToolApp(ctk.CTk):
 
         # 状态文字（替代原 Canvas LED）
         self._status_label = ctk.CTkLabel(
-            ctrl_frame, text="○ 已停止", text_color=COLOR_TEXT_DIM,
+            ctrl_frame, text=self._t("stopped"), text_color=COLOR_TEXT_DIM,
             font=ctk.CTkFont(size=13),
         )
         self._status_label.pack(side="left")
@@ -893,11 +1349,11 @@ class DHCPToolApp(ctk.CTk):
 
         header = ctk.CTkFrame(lease_outer, fg_color="transparent")
         header.pack(fill="x", padx=16, pady=(14, 6))
-        ctk.CTkLabel(header, text="已分配客户端",
+        ctk.CTkLabel(header, text=self._t("assigned_clients"),
                      font=ctk.CTkFont(size=15, weight="bold"),
                      text_color=COLOR_TEXT).pack(side="left")
         self._lease_count_label = ctk.CTkLabel(
-            header, text="(0 台)", text_color=COLOR_ACCENT,
+            header, text=self._t("clients_count", 0), text_color=COLOR_ACCENT,
             font=ctk.CTkFont(size=12, weight="bold"),
         )
         self._lease_count_label.pack(side="left", padx=10)
@@ -931,10 +1387,10 @@ class DHCPToolApp(ctk.CTk):
             tree_frame, columns=columns, show="headings",
             style="DHCPTable.Treeview", selectmode="browse",
         )
-        self._tree.heading("mac", text="MAC 地址")
-        self._tree.heading("ip", text="IP 地址")
-        self._tree.heading("hostname", text="主机名")
-        self._tree.heading("remaining", text="剩余租约")
+        self._tree.heading("mac", text=self._t("col_mac"))
+        self._tree.heading("ip", text=self._t("col_ip"))
+        self._tree.heading("hostname", text=self._t("col_hostname"))
+        self._tree.heading("remaining", text=self._t("col_remaining"))
         self._tree.column("mac", width=160, minwidth=130, anchor="center")
         self._tree.column("ip", width=140, minwidth=110, anchor="center")
         self._tree.column("hostname", width=160, minwidth=100, anchor="w")
@@ -951,7 +1407,7 @@ class DHCPToolApp(ctk.CTk):
 
         # 空状态提示（覆盖在表格中央）
         self._empty_label = ctk.CTkLabel(
-            tree_frame, text="暂无客户端连接，等待 DHCP 请求...",
+            tree_frame, text=self._t("empty_clients"),
             text_color=COLOR_TEXT_DIM, font=ctk.CTkFont(size=13),
         )
 
@@ -962,20 +1418,20 @@ class DHCPToolApp(ctk.CTk):
         bar.pack_propagate(False)
 
         self._status_listen = ctk.CTkLabel(
-            bar, text="监听: — (未运行)", text_color=COLOR_TEXT_DIM,
+            bar, text=self._t("listen_idle"), text_color=COLOR_TEXT_DIM,
             font=ctk.CTkFont(size=11),
         )
         self._status_listen.pack(side="left", padx=16, pady=4)
 
         # 防火墙状态（常驻提示）
         self._status_firewall = ctk.CTkLabel(
-            bar, text="防火墙: 未配置", text_color=COLOR_TEXT_DIM,
+            bar, text=self._t("firewall_pending"), text_color=COLOR_TEXT_DIM,
             font=ctk.CTkFont(size=11),
         )
         self._status_firewall.pack(side="left", padx=16, pady=4)
 
         self._status_uptime = ctk.CTkLabel(
-            bar, text="运行时间: 00:00:00", text_color=COLOR_TEXT_DIM,
+            bar, text=self._t("uptime_idle"), text_color=COLOR_TEXT_DIM,
             font=ctk.CTkFont(size=11),
         )
         self._status_uptime.pack(side="right", padx=16, pady=4)
@@ -984,15 +1440,15 @@ class DHCPToolApp(ctk.CTk):
         """更新防火墙状态栏提示。state: pending/ok/fail。"""
         if state == "ok":
             self._status_firewall.configure(
-                text="防火墙: 已放行 UDP 67/68", text_color=COLOR_SUCCESS,
+                text=self._t("firewall_ok"), text_color=COLOR_SUCCESS,
             )
         elif state == "fail":
             self._status_firewall.configure(
-                text="防火墙: 配置失败，请手动放行", text_color=COLOR_DANGER,
+                text=self._t("firewall_fail"), text_color=COLOR_DANGER,
             )
         else:
             self._status_firewall.configure(
-                text="防火墙: 未配置", text_color=COLOR_TEXT_DIM,
+                text=self._t("firewall_pending"), text_color=COLOR_TEXT_DIM,
             )
 
     # ------------------------------------------------------------------
@@ -1004,7 +1460,7 @@ class DHCPToolApp(ctk.CTk):
         self._interfaces = get_network_interfaces()
         labels = [i["label"] for i in self._interfaces]
         if not labels:
-            labels = ["（未找到可用网卡）"]
+            labels = [self._t("no_adapter_found")]
             logger.warning("未找到可用网卡")
         self._iface_combo.configure(values=labels)
         if labels:
@@ -1091,7 +1547,7 @@ class DHCPToolApp(ctk.CTk):
             iface = self._get_selected_interface()
             if not iface:
                 logger.warning("未选择有效网卡")
-                messagebox.showerror("错误", "请选择一块有效的网卡。", parent=self)
+                messagebox.showerror(self._t("error_title"), self._t("no_adapter"), parent=self)
                 return
 
             start_ip = self._entry_start_ip.get().strip()
@@ -1104,30 +1560,32 @@ class DHCPToolApp(ctk.CTk):
                         start_ip, end_ip, mask, gateway, dns, lease_str)
 
             errors: List[str] = []
-            for label_text, val in [("起始 IP", start_ip), ("结束 IP", end_ip),
-                                    ("子网掩码", mask), ("网关", gateway), ("DNS", dns)]:
+            field_labels = [
+                (self._t("start_ip"), start_ip), (self._t("end_ip"), end_ip),
+                (self._t("subnet_mask"), mask), (self._t("gateway"), gateway),
+                (self._t("dns_server"), dns),
+            ]
+            for label_text, val in field_labels:
                 if not validate_ip(val):
-                    errors.append(f'{label_text} "{val}" 不是合法的 IPv4 地址。')
+                    errors.append(self._t("invalid_ip", label_text, val))
             try:
                 lease_time = int(lease_str)
                 if lease_time < 60:
-                    errors.append("租约时间不能小于 60 秒。")
+                    errors.append(self._t("lease_too_short"))
             except ValueError:
-                errors.append(f'租约时间 "{lease_str}" 不是整数。')
+                errors.append(self._t("lease_not_int", lease_str))
                 lease_time = 3600
 
-            # 【修复关键点】原代码错误调用 ip_in_range(start_ip, end_ip)（少一个参数）
-            # 会导致 TypeError 被静默吞掉，按钮完全没反应。这里改用正确的 ip_le 比较。
             if not errors:
                 try:
                     if not ip_le(start_ip, end_ip):
-                        errors.append("起始 IP 不能大于结束 IP。")
+                        errors.append(self._t("start_gt_end"))
                 except Exception as exc:
-                    errors.append(f"起始/结束 IP 比较失败：{exc}")
+                    errors.append(f"{exc}")
 
             if errors:
                 logger.warning("配置校验失败: %s", errors)
-                messagebox.showerror("配置错误", "\n".join(errors), parent=self)
+                messagebox.showerror(self._t("config_error"), "\n".join(errors), parent=self)
                 return
 
             config = {
@@ -1144,19 +1602,17 @@ class DHCPToolApp(ctk.CTk):
                 self._set_firewall_status("fail")
                 logger.warning("防火墙规则配置失败，但继续尝试启动 DHCP 服务")
                 messagebox.showwarning(
-                    "防火墙提示",
-                    "自动放行防火墙 UDP 67/68 端口失败。\n"
-                    "DHCP 服务仍会尝试启动，但可能无法接收客户端请求。\n\n"
-                    "请手动放行 UDP 67/68 端口，或检查防火墙设置。",
+                    self._t("fw_warning_title"),
+                    self._t("fw_warning_body"),
                     parent=self,
                 )
 
             logger.info("调用 DHCPServer.start() ...")
             ok = self._server.start(config)
             if not ok:
-                err = self._server.last_error or "无法启动 DHCP 服务，请检查端口占用和权限。"
+                err = self._server.last_error or self._t("start_failed")
                 logger.error("启动失败: %s", err)
-                messagebox.showerror("启动失败", err, parent=self)
+                messagebox.showerror(self._t("error_title"), err, parent=self)
                 return
 
             self._start_time = time.time()
@@ -1166,7 +1622,7 @@ class DHCPToolApp(ctk.CTk):
             logger.exception("_on_start 发生异常: %s", exc)
             try:
                 messagebox.showerror(
-                    "启动异常", f"启动过程中发生错误：\n{exc}", parent=self
+                    self._t("error_title"), self._t("start_exception", exc), parent=self
                 )
             except Exception:
                 pass
@@ -1182,7 +1638,7 @@ class DHCPToolApp(ctk.CTk):
         except Exception as exc:
             logger.exception("_on_stop 发生异常: %s", exc)
             try:
-                messagebox.showerror("停止异常", f"停止过程中发生错误：\n{exc}", parent=self)
+                messagebox.showerror(self._t("error_title"), self._t("stop_exception", exc), parent=self)
             except Exception:
                 pass
 
@@ -1192,14 +1648,14 @@ class DHCPToolApp(ctk.CTk):
             self._btn_start.configure(state="disabled")
             self._btn_stop.configure(state="normal")
             self._status_label.configure(
-                text="● 运行中", text_color=COLOR_SUCCESS,
+                text=self._t("running"), text_color=COLOR_SUCCESS,
                 font=ctk.CTkFont(size=13, weight="bold"),
             )
         else:
             self._btn_start.configure(state="normal")
             self._btn_stop.configure(state="disabled")
             self._status_label.configure(
-                text="○ 已停止", text_color=COLOR_TEXT_DIM,
+                text=self._t("stopped"), text_color=COLOR_TEXT_DIM,
                 font=ctk.CTkFont(size=13),
             )
 
@@ -1234,7 +1690,7 @@ class DHCPToolApp(ctk.CTk):
             self._tree.delete(iid)
 
         count = len(leases)
-        self._lease_count_label.configure(text=f"({count} 台)")
+        self._lease_count_label.configure(text=self._t("clients_count", count))
 
         # 空状态提示
         if count == 0:
@@ -1262,7 +1718,7 @@ class DHCPToolApp(ctk.CTk):
                 cfg = self._server.config
                 ip = cfg.get("interface_ip", "?")
                 self._status_listen.configure(
-                    text=f"监听: 0.0.0.0:67   绑定网卡: {ip}",
+                    text=self._t("listen_running", ip),
                     text_color=COLOR_SUCCESS,
                 )
                 if self._start_time:
@@ -1271,15 +1727,15 @@ class DHCPToolApp(ctk.CTk):
                     m = (uptime % 3600) // 60
                     s = uptime % 60
                     self._status_uptime.configure(
-                        text=f"运行时间: {h:02d}:{m:02d}:{s:02d}",
+                        text=self._t("uptime_running", f"{h:02d}:{m:02d}:{s:02d}"),
                         text_color=COLOR_SUCCESS,
                     )
             else:
                 self._status_listen.configure(
-                    text="监听: — (未运行)", text_color=COLOR_TEXT_DIM,
+                    text=self._t("listen_idle"), text_color=COLOR_TEXT_DIM,
                 )
                 self._status_uptime.configure(
-                    text="运行时间: 00:00:00", text_color=COLOR_TEXT_DIM,
+                    text=self._t("uptime_idle"), text_color=COLOR_TEXT_DIM,
                 )
         except Exception as exc:
             logger.debug("状态栏更新失败: %s", exc)
