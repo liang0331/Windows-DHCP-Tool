@@ -1,62 +1,93 @@
-# DHCP Tool — Windows DHCP 分配工具
+# Windows DHCP Tool
 
-一个简单易用的 Windows DHCP 服务分配工具，双击即可运行。
+A simple, easy-to-use Windows DHCP server assignment tool. Just double-click and run.
 
-## 功能
+## Features
 
-- **网卡选择** — 自动枚举本机所有可用网卡，下拉选择
-- **IP 池配置** — 设置起始 IP、结束 IP、子网掩码、网关、DNS、租约时间
-- **一键启停** — 点击"启动 DHCP"即刻运行，支持随时停止
-- **防火墙自动配置** — 启动时自动添加 Windows 防火墙入站规则（UDP 67/68），状态栏实时显示放行状态
-- **客户端列表** — 实时刷新已分配客户端（MAC 地址 / IP 地址 / 主机名 / 剩余租约）
-- **完整 DHCP 协议** — 基于 RFC 2131 实现，支持 Discover → Offer → Request → Ack 完整流程
+- **Network Adapter Selection** — Automatically enumerates all local network adapters
+- **IP Pool Configuration** — Set start IP, end IP, subnet mask, gateway, DNS, lease time
+- **One-Click Start/Stop** — Click "Start DHCP" to run instantly, stop anytime
+- **Firewall Auto-Configuration** — Automatically adds Windows firewall inbound rules (UDP 67/68) on startup, with real-time status indicator in the status bar
+- **Client List** — Real-time refresh of assigned clients (MAC address / IP address / hostname / lease remaining)
+- **Full DHCP Protocol** — RFC 2131 compliant, supports Discover → Offer → Request → Ack complete flow
+- **Multi-Language Support** — 10 languages with auto-detection and manual switching
 
-## 使用方法
+## Supported Languages
 
-1. **下载** — 从 [Releases](https://github.com/lll031/Windows-DHCP-Tool/releases) 获取最新版 `DHCPTool.exe`
-2. **运行** — 双击 `DHCPTool.exe`（首次运行会弹出 UAC 提示，点"是"授予管理员权限）
-3. **选择网卡** — 下拉选择你需要开放 DHCP 服务的网卡（建议选择内网网卡）
-4. **配置网段** — 填写 IP 分配范围，默认值通常可直接使用
-5. **启动** — 点击"▶ 启动 DHCP"，防火墙规则自动配置，状态栏提示"防火墙: 已放行 UDP 67/68"
-6. **其他设备接入同网段即可自动获取 IP**
+| Language | Native Name |
+|----------|-------------|
+| English | English |
+| Chinese | 中文 |
+| Hindi | हिन्दी |
+| Spanish | Español |
+| French | Français |
+| Arabic | العربية |
+| Bengali | বাংলা |
+| Russian | Русский |
+| Portuguese | Português |
+| Japanese | 日本語 |
 
-## 开发
+The tool automatically detects your system language on startup. You can also switch languages anytime using the dropdown in the top bar.
+
+## Usage
+
+1. **Download** — Get the latest `DHCPTool.exe` from [Releases](https://github.com/liang0331/Windows-DHCP-Tool/releases)
+2. **Run** — Double-click `DHCPTool.exe` (UAC prompt will appear, click "Yes" to grant admin privileges)
+3. **Select Adapter** — Choose the network adapter you want to provide DHCP service on (internal adapter recommended)
+4. **Configure IP Range** — Fill in the IP allocation range, default values usually work fine
+5. **Start** — Click "▶ Start DHCP", firewall rules are auto-configured, status bar shows "Firewall: UDP 67/68 allowed"
+6. **Other devices on the same network segment will automatically obtain IP addresses**
+
+## Development
 
 ```bash
-# 克隆仓库
-git clone https://github.com/lll031/Windows-DHCP-Tool.git
+# Clone the repository
+git clone https://github.com/liang0331/Windows-DHCP-Tool.git
 cd Windows-DHCP-Tool
 
-# 创建虚拟环境（Python 3.8+）
+# Create virtual environment (Python 3.8+)
 python -m venv .venv
 .venv\Scripts\activate
 
-# 安装依赖
+# Install dependencies
 pip install customtkinter psutil pyinstaller
 
-# 运行调试
+# Run in debug mode
 python dhcptool\main.py
 
-# 打包为 exe
+# Build exe
 pyinstaller --onefile --windowed --uac-admin --name DHCPTool --collect-all customtkinter --hidden-import psutil dhcptool\main.py
 ```
 
-## 系统要求
+## System Requirements
 
-- **操作系统**: Windows 10 / Windows 11（64 位）
-- **权限**: 管理员权限（需要绑定 UDP 端口 67）
-- **依赖**: 无需额外安装，单文件 exe 开箱即用
+- **OS**: Windows 10 / Windows 11 (64-bit)
+- **Privileges**: Administrator (required to bind UDP port 67)
+- **Dependencies**: None — single-file exe, works out of the box
 
-## 常见问题
+## FAQ
 
-**Q: 为什么需要管理员权限？**
-DHCP 服务的标准端口 UDP 67 需要管理员权限才能绑定，exe 已内嵌 UAC 清单，双击会自动申请权限。
+**Q: Why is administrator privilege required?**
+The standard DHCP server port UDP 67 requires admin privileges to bind. The exe has an embedded UAC manifest and will automatically request elevation on launch.
 
-**Q: 客户端无法获取 IP？**
-- 检查状态栏是否显示"防火墙: 已放行 UDP 67/68"
-- 确认客户端设备与运行 DHCP 工具的网卡在同一网段
-- 检查无线路由器/交换机是否启用了 DHCP Snooping
+**Q: Clients cannot obtain IP?**
+- Check if the status bar shows "Firewall: UDP 67/68 allowed"
+- Ensure client devices are on the same network segment as the adapter running the DHCP tool
+- Check if your switch/router has DHCP Snooping enabled
 
-## 许可证
+## Tech Stack
+
+- **Language**: Python 3.13
+- **GUI**: customtkinter (modern dark-themed tkinter)
+- **DHCP Core**: Pure Python socket implementation (RFC 2131)
+- **Packaging**: PyInstaller (single-file exe with UAC manifest)
+- **Network Info**: psutil
+
+## License
 
 MIT License
+
+## Download
+
+- **GitHub Releases**: [latest version](https://github.com/liang0331/Windows-DHCP-Tool/releases)
+- **Gitee (China mirror)**: [https://gitee.com/LLL0558/Windows-DHCP-Tool](https://gitee.com/LLL0558/Windows-DHCP-Tool)
