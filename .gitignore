@@ -1,0 +1,23 @@
+# Build output
+*.exe
+*.spec
+*.log
+*.zip
+
+# Python venv
+.venv/
+__pycache__/
+*.pyc
+
+# PyInstaller build artifacts
+dhcptool/build/
+dhcptool/dist/
+dhcptool/DHCPTool.spec
+
+# IDE / workspace
+.workbuddy/
+neodata_out/
+
+# OS
+Thumbs.db
+.DS_Store
